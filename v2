@@ -1,0 +1,194 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <tuple>
+#include <thread>
+#include <fstream>
+#include "ConsoleColor.h"
+#include <windows.h>
+#include <mutex>
+using namespace std;
+mutex mtx;
+
+void gotoxy(int x, int y);
+void ShowConsoleCursor(bool showFlag);
+
+class Turing
+{
+private:
+	int head;
+	string tape;
+	string state;
+	bool first, error;
+	int steps;
+	int fix;
+	typedef vector<tuple<string, string, string, string, string>> rules;
+	rules R;
+public:
+	void operator ()() { Work(); }
+	Turing() { head = 0, state = "0", first = true, error = false, steps = 0; }
+	void ReadFile(string file, int x)
+	{
+		ifstream input(file);
+		string var;
+		input >> head;
+		input >> tape;
+		fix = x;
+		string busena, nauja_busena, simbolis, naujas_simbolis, pozicija;
+		while (true)
+		{
+			input >> busena >> simbolis >> naujas_simbolis >> pozicija >> nauja_busena;
+			if (!input) break;
+			R.push_back(tuple<string, string, string, string, string>(busena, simbolis, naujas_simbolis, pozicija, nauja_busena));
+		}
+		input.close();
+	}
+	void Work()
+	{
+		while (Halt(state))
+		{
+			mtx.lock();
+			gotoxy(0, 0 + fix * 4);
+			Rules(head);
+			if (error || head <= 0 || head > tape.length())
+			{
+				if (error) PrintError("state");
+				else if (head <= 0 || head > tape.length()) PrintError("head");
+				mtx.unlock();
+				break;
+			}
+			steps++;
+			cout << green << "STEPS: " << steps << "  HEAD: " << head << "  STATE: " << state << " " << white << endl;
+			Tape();
+			if (!Halt(state))
+			{
+				gotoxy(0, 0 + fix * 4 + 2);
+				cout << green << "SUCCESSFULLY HALTED" << white;
+			}
+			mtx.unlock();
+			Sleep(40);
+		}
+	}
+	void Rules(int& head)
+	{
+		bool found = false;
+		string o_state, o_symbol, n_symbol, direction;
+		o_symbol.push_back(tape[head - 1]);
+		for (rules::const_iterator i = R.begin(); i != R.end(); ++i)
+		{
+			if (o_symbol == get<1>(*i) && state == get<0>(*i))
+			{
+				found = true;
+				n_symbol = get<2>(*i);
+				tape[head - 1] = n_symbol[0];
+				direction = get<3>(*i);
+				if (direction == "L")	head--;
+				else if (direction == "R")	head++;
+				state = get<4>(*i);
+				break;
+			}
+			if (found) break;
+		}
+		if (!found)
+		{
+			error = true;
+			PrintError("state");
+		}
+	}
+	void PrintError(string abc)
+	{
+		gotoxy(0, 0 + fix * 4 + 2);
+		if (abc == "state") cout << red << "STATE ERROR AT STATE : " << blue << state << white;
+		else if (abc == "head") cout << red << "HEAD IS OUT OF TAPE BOUNDS, CHECK RULES FOR HUMAN ERRORS :" << white;
+		else cout << red << "UNDEFINED ERROR : " << white;
+	}
+	void Tape()
+	{
+		for (int i = 0; i < tape.length(); i++)
+		{
+			if (i == head - 1)	cout << red << "(" << tape[i] << ")" << white;
+			else cout << tape[i];
+		}
+	}
+	bool Halt(string state)
+	{
+		if (state == "X") return false;
+		else return true;
+	}
+	~Turing() {}
+};
+
+void PrintMenu()
+{
+	cout << yellow << "Welcome to the menu, please choose a method to launch Turings Machine: \n";
+	cout << "1. Launch a single Turing machine\n";
+	cout << "2. Launch multiple Turing machines working synchronically\n";
+}
+
+int main()
+{
+	char choice;
+	PrintMenu();
+	while (true)
+	{
+		cin >> choice;
+		if (choice == '1' || choice == '2')	break;
+		else cout << red << "Pasirinktas neegzistuojantis variantas.\n" << yellow;
+	}
+	if (choice == '1')
+	{
+		Turing Machine;
+		string filename;
+		cout << yellow << "Iveskite failo pavadinima: ";
+		cin >> filename;
+		Machine.ReadFile(filename,0);
+		system("CLS");
+		Machine.Work();
+	}
+	else
+	{
+		system("CLS");
+		int n;
+		cout << yellow << "Iveskite kiek masinu paleisite: ";
+		cin >> n;
+		string* filenames;
+		filenames = new string[n];
+		for (int i = 0; i < n; i++)
+		{
+			cout << yellow << "Iveskite visus failu vardus: \n";
+			cin >> filenames[i];
+		}
+		system("CLS");
+		ShowConsoleCursor(false);
+		vector<thread> Threads(n);
+		Turing* Machine = new Turing[n];
+		for (int i = 0; i < n; i++)
+			Machine[i].ReadFile(filenames[i], i);
+
+		for (int i = 0; i < n; i++)
+			Threads[i] = thread(Machine[i]);
+
+		for (int i = 0; i < n; i++)
+			Threads[i].join();
+
+		delete[]filenames;
+		delete[]Machine;
+	}
+	return 0;
+}
+void gotoxy(int x, int y)
+{
+	COORD pos = { x, y };
+	HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleCursorPosition(output, pos);
+}
+void ShowConsoleCursor(bool showFlag)
+{
+	HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	CONSOLE_CURSOR_INFO     cursorInfo;
+
+	GetConsoleCursorInfo(out, &cursorInfo);
+	cursorInfo.bVisible = showFlag; // set the cursor visibility
+	SetConsoleCursorInfo(out, &cursorInfo);
+}
