@@ -1,0 +1,192 @@
+#include <iostream>
+#include <cmath>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <tuple>
+#include <thread>
+#include <fstream>
+#include "ConsoleColor.h"
+#include <windows.h>
+using namespace std;
+
+
+void gotoxy(int x, int y) 
+{
+	COORD pos = { x, y };
+	HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleCursorPosition(output, pos);
+}
+
+void ShowConsoleCursor(bool showFlag)
+{
+	HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	CONSOLE_CURSOR_INFO     cursorInfo;
+
+	GetConsoleCursorInfo(out, &cursorInfo);
+	cursorInfo.bVisible = showFlag; // set the cursor visibility
+	SetConsoleCursorInfo(out, &cursorInfo);
+}
+class Turing
+{
+private:
+	int head;
+	string tape;
+	string state;
+	bool first, error;
+	int steps;
+	typedef vector<tuple<string, string, string, string, string>> rules;
+	rules R;
+public:
+	void operator ()() { Work(); }
+	Turing() 
+	{ 
+		head = 0, state = "0", first = true, error = false, steps = 0;
+		system("CLS");
+	}
+	void ReadFile(string file)
+	{
+		ifstream input(file);
+		string var;
+		input >> head;
+		input >> tape;
+		string busena, nauja_busena, simbolis, naujas_simbolis, pozicija;
+		while (true)
+		{
+			input >> busena >> simbolis >> naujas_simbolis >> pozicija >> nauja_busena;
+			if (!input) break;
+			R.push_back(tuple<string, string, string, string, string>(busena, simbolis, naujas_simbolis, pozicija, nauja_busena));
+		}
+		input.close();
+	}
+	void Print()
+	{
+		cout << "TAPE CONTENT : " << tape << endl;
+		cout << "HEAD POSITION : " << head << endl;
+		cout << "RULES : " << endl;
+		for (rules::const_iterator i = R.begin(); i != R.end(); ++i)
+		{
+			cout << get<0>(*i) << " " << get<1>(*i) << " " << get<2>(*i) << " " << get<3>(*i) << " " << get<4>(*i) << endl;
+		}
+	}
+	void Work()
+	{
+		while (Halt(state))
+		{
+			gotoxy(0, 0);
+			Rules(head);
+			if (error)
+				break;
+			steps++;
+			cout << green << "STEPS: " << steps << "  HEAD: " << head << "  STATE: " << state << white << endl;
+			Tape();
+			Sleep(10);
+		}
+		system("CLS");
+	}
+	void Rules(int & head)
+	{
+		bool found = false;
+		string o_state, o_symbol, n_symbol, direction;
+		o_symbol.push_back(tape[head-1]);
+		for (rules::const_iterator i = R.begin(); i != R.end(); ++i)
+		{
+			if (first)
+			{
+					if (o_symbol == get<1>(*i))
+					{
+						found = true;
+						n_symbol = get<2>(*i);
+						tape[head-1] = n_symbol[0];
+						direction = get<3>(*i);
+						if (direction == "L")
+							head--;
+						else if (direction == "R")
+							head++;
+						state = get<4>(*i);
+						first = false;
+						break;
+					}
+			}
+			else
+			{
+				if (state == get<0>(*i))
+				{
+					
+
+						if (o_symbol == get<1>(*i))
+						{
+							found = true;
+							n_symbol = get<2>(*i);
+							tape[head-1] = n_symbol[0];
+							direction = get<3>(*i);
+							if (direction == "L")
+								head--;
+							else if (direction == "R")
+								head++;
+							state = get<4>(*i);
+							break;
+						}
+				}
+			}
+			if (found)
+				break;
+		}
+		if (!found)
+		{
+			error = true;
+			PrintError();
+			
+		}
+	}
+	void PrintError()
+	{
+		gotoxy(0, 3);
+		cout << red << "STATE ERROR AT STATE : " << blue << state << white;;
+
+	}
+	void Tape()
+	{
+		for (int i = 0; i < tape.length(); i++)
+		{
+			if (i == head - 1)
+				cout << red << "(" << tape[i] << ")" << white;
+			else cout << tape[i];
+		}
+	}
+	bool Halt(string state)
+	{
+		if (state == "X")
+			return false;
+		else return true;
+	}
+	~Turing() {}
+};
+
+int main()
+{
+	int n;
+	cout << red << "Iveskite kiek masinu paleisite: ";
+	cin >> n;
+	string *filenames;
+	filenames = new string[n];
+	for (int i = 0; i < n; i++)
+	{
+		cout << "Iveskite visus failu vardus: \n";
+		cin >> filenames[i];
+		
+	}
+	system("CLS");
+	ShowConsoleCursor(false);
+	vector<thread> Threads(n);
+	Turing* Machine = new Turing[n];
+
+	for (int i = 0; i < n; i++)
+		Machine[i].ReadFile(filenames[i]);
+	
+
+	delete[]filenames;
+	delete[]Machine;
+	return 0;
+}
